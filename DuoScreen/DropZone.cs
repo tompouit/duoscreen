@@ -66,6 +66,18 @@ namespace DuoScreen
             get { return true; }
         }
 
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                //Adde shadow under the form:
+                const int CS_DROPSHADOW = 0x20000;
+                CreateParams cp = base.CreateParams;
+                cp.ClassStyle |= CS_DROPSHADOW;
+                return cp;
+            }
+        }
+
         protected override void OnShown(EventArgs e)
         {
             border.Show();
@@ -138,6 +150,7 @@ namespace DuoScreen
             this.ShowInTaskbar = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
             this.ResumeLayout(false);
+
         }
 
         private void Position(int x, int y, int width, int height)
