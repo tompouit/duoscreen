@@ -67,6 +67,32 @@ namespace DuoScreen
         [DllImport("user32.dll")]
         public static extern IntPtr GetForegroundWindow();
 
+        [DllImport("user32.dll")]
+        public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, IntPtr lParam, SendMessageTimeoutFlags fuFlags, uint uTimeout, out UIntPtr lpdwResult);
+
+        [DllImport("Shell32.dll")]
+        public static extern int SHChangeNotify(HChangeNotifyEventID eventId, HChangeNotifyFlags flags, IntPtr item1, IntPtr item2);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetWindow(IntPtr hWnd, GetWindowType uCmd);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetTopWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern bool SystemParametersInfo(int uiAction, int uiParam, ref RectInter pvParam, int fWinIni);
+
+        [DllImport("user32.dll")]
+        public static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+        [DllImport("user32.dll")]
+        public static extern int GetClassName(IntPtr hWnd, StringBuilder pClassName, int nMaxCount);
+
+
+        [DllImport("user32.dll")]
+        public static extern bool EnumWindows(EnumWindowsProc pEnumFunc, IntPtr lParam);
+        public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
         [StructLayout(LayoutKind.Sequential)]
         public struct PointInter
         {
@@ -83,15 +109,9 @@ namespace DuoScreen
             public int top;
             public int right;
             public int bottom;
+            public RectInter(int left, int top, int right, int bottom) { this.left = left; this.top = top; this.right = right; this.bottom = bottom; }
             public static explicit operator Rectangle(RectInter rect) => new Rectangle(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
-        }
-
-        public struct RECT
-        {
-            public int left;
-            public int top;
-            public int right;
-            public int bottom;
+            public static explicit operator RectInter(Rectangle rect) => new RectInter(rect.Left, rect.Top, rect.Right, rect.Bottom);
         }
 
         public struct WINDOWPLACEMENT
@@ -110,8 +130,16 @@ namespace DuoScreen
             public IntPtr hWnd;
             public int uCallbackMessage;
             public int uEdge;
-            public RECT rc;
+            public RectInter rc;
             public IntPtr lParam;
+        }
+
+        public struct MONITORINFO
+        {
+            public int cbSize;
+            public RectInter rcMonitor;
+            public RectInter rcWorkArea;
+            public uint dwFlags;
         }
 
         public const int SW_HIDE = 0;
@@ -166,6 +194,14 @@ namespace DuoScreen
         public const uint OBJID_TITLEBAR = 0xFFFFFFFE;
         public const uint CHILDID_SELF = 0;
 
+        public const int WM_SETTINGCHANGE= 0x001A;
+        public const int WM_THEMECHANGED = 0x031A;
+
+        public const int HWND_BROADCAST = 0xffff;
+
+        public const int SPI_GETWORKAREA = 0x0030;
+
+        public const int WPF_SETMINPOSITION = 0x0001;
 
         public enum ABMsg : int
         {
@@ -180,6 +216,62 @@ namespace DuoScreen
             ABM_SETAUTOHIDEBAR,
             ABM_WINDOWPOSCHANGED,
             ABM_SETSTATE
+        }
+        public enum SendMessageTimeoutFlags : uint
+        {
+            SMTO_NORMAL             = 0x0,
+            SMTO_BLOCK              = 0x1,
+            SMTO_ABORTIFHUNG        = 0x2,
+            SMTO_NOTIMEOUTIFNOTHUNG = 0x8,
+            SMTO_ERRORONEXIT = 0x20
+        }
+
+        public enum GetWindowType : uint
+        {
+            GW_HWNDFIRST = 0,
+            GW_HWNDLAST = 1,
+            GW_HWNDNEXT = 2,
+            GW_HWNDPREV = 3,
+            GW_OWNER = 4,
+            GW_CHILD = 5,
+            GW_ENABLEDPOPUP = 6
+        }
+
+        public enum HChangeNotifyEventID
+        {
+            SHCNE_ALLEVENTS = 0x7FFFFFFF,
+            SHCNE_ASSOCCHANGED = 0x08000000,
+            SHCNE_ATTRIBUTES = 0x00000800,
+            SHCNE_CREATE = 0x00000002,
+            SHCNE_DELETE = 0x00000004,
+            SHCNE_DRIVEADD = 0x00000100,
+            SHCNE_DRIVEADDGUI = 0x00010000,
+            SHCNE_DRIVEREMOVED = 0x00000080,
+            SHCNE_EXTENDED_EVENT = 0x04000000,
+            SHCNE_FREESPACE = 0x00040000,
+            SHCNE_MEDIAINSERTED = 0x00000020,
+            SHCNE_MEDIAREMOVED = 0x00000040,
+            SHCNE_MKDIR = 0x00000008,
+            SHCNE_NETSHARE = 0x00000200,
+            SHCNE_NETUNSHARE = 0x00000400,
+            SHCNE_RENAMEFOLDER = 0x00020000,
+            SHCNE_RENAMEITEM = 0x00000001,
+            SHCNE_RMDIR = 0x00000010,
+            SHCNE_SERVERDISCONNECT = 0x00004000,
+            SHCNE_UPDATEDIR = 0x00001000,
+            SHCNE_UPDATEIMAGE = 0x00008000,
+        }
+
+        public enum HChangeNotifyFlags
+        {
+            SHCNF_DWORD = 0x0003,
+            SHCNF_IDLIST = 0x0000,
+            SHCNF_PATHA = 0x0001,
+            SHCNF_PATHW = 0x0005,
+            SHCNF_PRINTERA = 0x0002,
+            SHCNF_PRINTERW = 0x0006,
+            SHCNF_FLUSH = 0x1000,
+            SHCNF_FLUSHNOWAIT = 0x2000
         }
     }
 }

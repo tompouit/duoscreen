@@ -87,53 +87,61 @@ namespace DuoScreen
         {
             Screen topScreen    = Screen.AllScreens[0];
             Screen bottomScreen = Screen.AllScreens[1];
+            Point bottomScreenDelta = GetBottomScreenDelta();
             switch (selection)
             {
-                case DropBar.SelectionType.ToBottom:
-                case DropBar.SelectionType.ToBottomLeft:
-                case DropBar.SelectionType.ToBottomRight:
-                case DropBar.SelectionType.OnBottom:
-                case DropBar.SelectionType.OnBottomLeft:
-                case DropBar.SelectionType.OnBottomRight:
-                    SetSizeTo1Screen(bottomScreen, selection);
-                    break;
                 case DropBar.SelectionType.ToTop:
-                case DropBar.SelectionType.ToTopLeft:
-                case DropBar.SelectionType.ToTopRight:
                 case DropBar.SelectionType.OnTop:
+                case DropBar.SelectionType.ToTopLeft:
                 case DropBar.SelectionType.OnTopLeft:
+                case DropBar.SelectionType.ToTopRight:
                 case DropBar.SelectionType.OnTopRight:
-                    SetSizeTo1Screen(topScreen, selection);
+                    SetSizeTo1Screen(topScreen, Point.Empty, selection);
+                    break;
+                case DropBar.SelectionType.ToBottom:
+                case DropBar.SelectionType.OnBottom:
+                case DropBar.SelectionType.ToBottomLeft:
+                case DropBar.SelectionType.OnBottomLeft:
+                case DropBar.SelectionType.ToBottomRight:
+                case DropBar.SelectionType.OnBottomRight:
+                    SetSizeTo1Screen(bottomScreen, new Point(bottomScreenDelta.X, bottomScreenDelta.Y+topScreen.WorkingArea.Height), selection);
                     break;
                 case DropBar.SelectionType.Expand:
-                    Position(topScreen.WorkingArea.X, topScreen.WorkingArea.Y, topScreen.WorkingArea.Width, bottomScreen.WorkingArea.Bottom);
+                    Position(Math.Max(topScreen.Bounds.Left, bottomScreen.WorkingArea.Left), 0, Math.Min(topScreen.WorkingArea.Width, bottomScreen.WorkingArea.Width), bottomScreenDelta.Y+topScreen.WorkingArea.Height+bottomScreen.WorkingArea.Height);
                     break;
             }
         }
 
-        private void SetSizeTo1Screen(Screen screen, DropBar.SelectionType selection)
+        private void SetSizeTo1Screen(Screen screen, Point delta, DropBar.SelectionType selection)
         {
             switch (selection)
             {
-                case DropBar.SelectionType.ToBottom:
                 case DropBar.SelectionType.ToTop:
-                case DropBar.SelectionType.OnBottom:
                 case DropBar.SelectionType.OnTop:
-                    Position(screen.WorkingArea.X, screen.WorkingArea.Y, screen.WorkingArea.Width, screen.WorkingArea.Height);
+                case DropBar.SelectionType.ToBottom:
+                case DropBar.SelectionType.OnBottom:
+                    Position(delta.X, delta.Y, screen.WorkingArea.Width, screen.WorkingArea.Height);
                     break;
-                case DropBar.SelectionType.ToBottomLeft:
                 case DropBar.SelectionType.ToTopLeft:
-                case DropBar.SelectionType.OnBottomLeft:
                 case DropBar.SelectionType.OnTopLeft:
-                    Position(screen.WorkingArea.X, screen.WorkingArea.Y, screen.WorkingArea.Width/2, screen.WorkingArea.Height);
+                case DropBar.SelectionType.ToBottomLeft:
+                case DropBar.SelectionType.OnBottomLeft:
+                    Position(delta.X, delta.Y, screen.WorkingArea.Width/2, screen.WorkingArea.Height);
                     break;
-                case DropBar.SelectionType.ToBottomRight:
                 case DropBar.SelectionType.ToTopRight:
-                case DropBar.SelectionType.OnBottomRight:
                 case DropBar.SelectionType.OnTopRight:
-                    Position(screen.WorkingArea.X+screen.WorkingArea.Width/2, screen.WorkingArea.Y, screen.WorkingArea.Width/2, screen.WorkingArea.Height);
+                case DropBar.SelectionType.ToBottomRight:
+                case DropBar.SelectionType.OnBottomRight:
+                    Position(delta.X+screen.WorkingArea.Width/2, delta.Y, screen.WorkingArea.Width/2, screen.WorkingArea.Height);
                     break;
             }
+        }
+
+        private Point GetBottomScreenDelta()
+        {
+            Screen topScreen    = Screen.AllScreens[0];
+            Screen bottomScreen = Screen.AllScreens[1];
+            return new Point(bottomScreen.WorkingArea.Left - topScreen.WorkingArea.Left, (topScreen.Bounds.Bottom - topScreen.WorkingArea.Bottom) + (bottomScreen.WorkingArea.Top - bottomScreen.Bounds.Top));
         }
 
         private void InitializeComponent()

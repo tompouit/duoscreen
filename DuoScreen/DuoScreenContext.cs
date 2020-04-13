@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Win32;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -35,16 +36,17 @@ namespace DuoScreen
         class MoveDetect
         {
             public delegate void Callback(IntPtr hWnd);
+            public delegate void Callback2(IntPtr hWnd, Rectangle startPos);
             private enum Phase { None, StartMoveOrSize, Moving, Sizing }
 
             private Phase phase;
-            private Size startWndSize;
+            private Rectangle wndStartPos;
             private IntPtr movingWnd;
             private readonly Callback beginMoving;
-            private readonly Callback endMoving;
+            private readonly Callback2 endMoving;
             private readonly Callback continueMoving;
 
-            public MoveDetect(Callback beginFunc, Callback endFunc, Callback continueFunc)
+            public MoveDetect(Callback beginFunc, Callback2 endFunc, Callback continueFunc)
             {
                 beginMoving += beginFunc;
                 endMoving += endFunc;
@@ -56,6 +58,7 @@ namespace DuoScreen
                 WinAPI.WINDOWPLACEMENT wndPlace = new WinAPI.WINDOWPLACEMENT();
                 wndPlace.length = Marshal.SizeOf(wndPlace);
                 WinAPI.GetWindowPlacement(hWnd, out wndPlace);
+                wndStartPos = (Rectangle)wndPlace.rcNormalPosition;
                 if ((wndPlace.showCmd & WinAPI.SW_SHOWMAXIMIZED) == WinAPI.SW_SHOWMAXIMIZED)
                 {
                     phase = Phase.Moving;
@@ -64,8 +67,6 @@ namespace DuoScreen
                 }
                 else
                 {
-                    WinAPI.GetWindowRect(hWnd, out WinAPI.RectInter r);
-                    startWndSize = new Size(r.right - r.left, r.bottom - r.top);
                     phase = Phase.StartMoveOrSize;
                 }
             }
@@ -73,7 +74,7 @@ namespace DuoScreen
             public void EndMoveOrSize()
             {
                 if (phase == Phase.Moving)
-                    endMoving(movingWnd);
+                    endMoving(movingWnd, wndStartPos);
                 phase = Phase.None;
                 movingWnd = IntPtr.Zero;
             }
@@ -82,9 +83,8 @@ namespace DuoScreen
             {
                 if (phase == Phase.StartMoveOrSize)
                 {
-                    WinAPI.GetWindowRect(hWnd, out WinAPI.RectInter r);
-                    Size wndSize = new Size(r.right - r.left, r.bottom - r.top);
-                    if (wndSize == startWndSize)
+                    WinAPI.GetWindowRect(hWnd, out WinAPI.RectInter rWnd);
+                    if (((Rectangle)rWnd).Size == wndStartPos.Size)
                     {
                         phase = Phase.Moving;
                         movingWnd = hWnd;
@@ -180,27 +180,31 @@ namespace DuoScreen
             dropBar.UpdateWholeDisplay();
         }
 
-        private void EndMovingWindow(IntPtr hWnd)
+        private void EndMovingWindow(IntPtr hWnd, Rectangle wndStartPos)
         {
             Debug.Assert(dropBar != null);
 
             switch (dropBar.Selection)
             {
+                case DropBar.SelectionType.ToTop:
+                case DropBar.SelectionType.ToTopLeft:
+                case DropBar.SelectionType.ToTopRight:
+                    //Keep same margin than it have on bottom screen:
+                    wndStartPos.Y = Screen.AllScreens[0].Bounds.Y + wndStartPos.Top-Screen.AllScreens[1].Bounds.Top;
+                    break;
                 case DropBar.SelectionType.ToBottom:
-                case DropBar.SelectionType.OnBottom:
-                    MaximizeWindowToScreen(hWnd, Screen.AllScreens[1]);
-                    break;
                 case DropBar.SelectionType.ToBottomLeft:
-                case DropBar.SelectionType.OnBottomLeft:
-                    ExpandWindowToHalfScreen(hWnd, Screen.AllScreens[1], true);
-                    break;
                 case DropBar.SelectionType.ToBottomRight:
-                case DropBar.SelectionType.OnBottomRight:
-                    ExpandWindowToHalfScreen(hWnd, Screen.AllScreens[1], false);
+                    //Set no margin for bottom screen because bottom screen is too small:
+                    wndStartPos.Y = Screen.AllScreens[1].Bounds.Y;
                     break;
+            }
+
+            switch (dropBar.Selection)
+            {
                 case DropBar.SelectionType.ToTop:
                 case DropBar.SelectionType.OnTop:
-                    MaximizeWindowToScreen(hWnd, Screen.AllScreens[0]);
+                    MaximizeWindowToScreen(hWnd, Screen.AllScreens[0], wndStartPos);
                     break;
                 case DropBar.SelectionType.ToTopLeft:
                 case DropBar.SelectionType.OnTopLeft:
@@ -210,6 +214,18 @@ namespace DuoScreen
                 case DropBar.SelectionType.OnTopRight:
                     ExpandWindowToHalfScreen(hWnd, Screen.AllScreens[0], false);
                     break;
+                case DropBar.SelectionType.ToBottom:
+                case DropBar.SelectionType.OnBottom:
+                    MaximizeWindowToScreen(hWnd, Screen.AllScreens[1], wndStartPos);
+                    break;
+                case DropBar.SelectionType.ToBottomLeft:
+                case DropBar.SelectionType.OnBottomLeft:
+                    ExpandWindowToHalfScreen(hWnd, Screen.AllScreens[1], true);
+                    break;
+                case DropBar.SelectionType.ToBottomRight:
+                case DropBar.SelectionType.OnBottomRight:
+                    ExpandWindowToHalfScreen(hWnd, Screen.AllScreens[1], false);
+                    break;
                 case DropBar.SelectionType.Expand:
                     ExpandWindowToBothScreens(hWnd);
                     break;
@@ -218,22 +234,15 @@ namespace DuoScreen
             dropBar = null;
         }
 
-        private void MaximizeWindowToScreen(IntPtr hWnd, Screen screen)
+        private void MaximizeWindowToScreen(IntPtr hWnd, Screen screen, Rectangle wndStartPos)
         {
-            Rectangle screenArea = screen.WorkingArea;
-            WinAPI.WINDOWPLACEMENT wndPlace = new WinAPI.WINDOWPLACEMENT();
-            wndPlace.length = Marshal.SizeOf(wndPlace);
-            WinAPI.GetWindowPlacement(hWnd, out wndPlace);
-
-            WinAPI.WINDOWPLACEMENT newPlace = new WinAPI.WINDOWPLACEMENT();
-            newPlace.showCmd = WinAPI.SW_MAXIMIZE;
-            newPlace.ptMaxPosition = screenArea.Location;
-            newPlace.ptMinPosition = screenArea.Location;
-            newPlace.rcNormalPosition.left = screenArea.Left;
-            newPlace.rcNormalPosition.top = screenArea.Top;
-            newPlace.rcNormalPosition.right = newPlace.rcNormalPosition.left + wndPlace.rcNormalPosition.right - wndPlace.rcNormalPosition.left;
-            newPlace.rcNormalPosition.bottom = newPlace.rcNormalPosition.top + wndPlace.rcNormalPosition.bottom - wndPlace.rcNormalPosition.top;
-            newPlace.length = Marshal.SizeOf(newPlace);
+            WinAPI.WINDOWPLACEMENT newPlace = new WinAPI.WINDOWPLACEMENT
+            {
+                length = Marshal.SizeOf(typeof(WinAPI.WINDOWPLACEMENT)),
+                showCmd = WinAPI.SW_MAXIMIZE,
+                ptMaxPosition = screen.Bounds.Location,
+                rcNormalPosition = (WinAPI.RectInter)wndStartPos
+            };
             WinAPI.SetWindowPlacement(hWnd, ref newPlace);
         }
 
@@ -252,30 +261,25 @@ namespace DuoScreen
 
         private void ExpandWindowToBothScreens(IntPtr hWnd)
         {
-            Rectangle topScreenArea     = Screen.AllScreens[0].WorkingArea;
-            Rectangle bottomScreenArea  = Screen.AllScreens[1].WorkingArea;
-            bool topScreenNeedsHideTaskBar       = (topScreenArea.Bottom != Screen.AllScreens[0].Bounds.Bottom);
-            bool bottomScreenNeedsHideTaskBar    = (bottomScreenArea.Top != Screen.AllScreens[1].Bounds.Top);
-
-            WinAPI.WINDOWPLACEMENT wndPlace = new WinAPI.WINDOWPLACEMENT();
-            wndPlace.length = Marshal.SizeOf(wndPlace);
-            WinAPI.GetWindowPlacement(hWnd, out wndPlace);
+            Screen topScreen         = Screen.AllScreens[0];
+            Screen bottomScreen      = Screen.AllScreens[1];
+            bool topScreenNeedsHideTaskBar       = (topScreen.WorkingArea.Bottom != topScreen.Bounds.Bottom);
+            bool bottomScreenNeedsHideTaskBar    = (bottomScreen.WorkingArea.Top != bottomScreen.Bounds.Top);
 
             WinAPI.RectInter newPos = new WinAPI.RectInter
             {
-                left = topScreenArea.Left,
-                top = topScreenArea.Top,
-                right = topScreenArea.Right,
-                bottom = bottomScreenArea.Bottom
+                left = Math.Max(topScreen.Bounds.Left, bottomScreen.WorkingArea.Left),
+                top = 0,
+                right = Math.Min(topScreen.WorkingArea.Width, bottomScreen.WorkingArea.Right),
+                bottom = (topScreenNeedsHideTaskBar ? topScreen.Bounds.Height : topScreen.WorkingArea.Height) + (bottomScreenNeedsHideTaskBar ? bottomScreen.Bounds.Height : bottomScreen.WorkingArea.Height)
             };
             WinAPI.AdjustWindowRectEx(ref newPos, WinAPI.GetWindowLong(hWnd, WinAPI.GWL_STYLE), false, WinAPI.GetWindowLong(hWnd, WinAPI.GWL_EXSTYLE));
-            newPos.top = topScreenArea.Top;
+            newPos.top = topScreen.Bounds.Top;
 
             WinAPI.WINDOWPLACEMENT newPlace = new WinAPI.WINDOWPLACEMENT
             {
                 showCmd = WinAPI.SW_NORMAL,
                 ptMaxPosition = Point.Empty,
-                ptMinPosition = Point.Empty,
                 rcNormalPosition = newPos,
                 length = Marshal.SizeOf(typeof(WinAPI.WINDOWPLACEMENT))
             };

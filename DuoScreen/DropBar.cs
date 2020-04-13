@@ -107,27 +107,23 @@ namespace DuoScreen
         private void UpdateMagnify(Point pos)
         {
             Rectangle hoverRectangle = ClientRectangle; hoverRectangle.Inflate(HoverMargin, HoverMargin);
-            if (hoverRectangle.Contains(pos))
+            SetMagnify(hoverRectangle.Contains(pos));
+        }
+
+        private void SetMagnify(bool magnify)
+        {
+            float scaling = 0;
+            if (magnify && !this.magnified)
+                scaling = MagnifyFactor;
+            else if (!magnify && this.magnified)
+                scaling = 1f/MagnifyFactor;
+            if (scaling != 0)
             {
-                if (!magnified)
-                {
-                    Rectangle r0 = DesktopBounds;
-                    Scale(new SizeF(MagnifyFactor, MagnifyFactor));
-                    Rectangle r1 = DesktopBounds;
-                    SetDesktopLocation(r1.X - (r1.Width-r0.Width)/2, r1.Y - (r1.Height-r0.Height)/2);
-                    magnified = true;
-                }
-            }
-            else
-            {
-                if (magnified)
-                {
-                    Rectangle r0 = DesktopBounds;
-                    Scale(new SizeF(1f/MagnifyFactor, 1f/MagnifyFactor));
-                    Rectangle r1 = DesktopBounds;
-                    SetDesktopLocation(r1.X - (r1.Width-r0.Width)/2, r1.Y - (r1.Height-r0.Height)/2);
-                    magnified = false;
-                }
+                Rectangle r0 = DesktopBounds;
+                Scale(new SizeF(scaling, scaling));
+                Rectangle r1 = DesktopBounds;
+                SetDesktopLocation(r1.X - (r1.Width-r0.Width)/2, r1.Y - (r1.Height-r0.Height)/2);
+                this.magnified = magnify;
             }
         }
 
@@ -218,17 +214,20 @@ namespace DuoScreen
 
         private void DropBar_Shown(object sender, EventArgs e)
         {
+            SetMagnify(true);  //Reset magnification.
             //Set location near cursor position:
             WinAPI.GetCursorPos(out WinAPI.PointInter _pos);  Point pos = (Point)_pos;
-            Rectangle workingArea = Screen.FromPoint(pos).WorkingArea;
+            Screen screen = Screen.FromPoint(pos);
+            Rectangle workingArea = screen.WorkingArea;
             Point newLocation = new Point(pos.X - Width/2, pos.Y + DisplayMargin);
             //Adjust location to stay into working area:
-            if (pos.Y + DisplayMargin + Height > workingArea.Bottom)
-                newLocation.Y = pos.Y - DisplayMargin - Height;
-            if (pos.X - Width/2 < workingArea.Left)
-                newLocation.X = workingArea.Left;
-            else if (pos.X + Width/2 > workingArea.Right)
-                newLocation.X = workingArea.Right - Width;
+            Point delta = screen.Primary ? Point.Empty : GetBottomScreenDelta();
+            if (pos.Y + DisplayMargin + Height > delta.Y + workingArea.Height)
+                newLocation.Y = pos.Y - Screen.PrimaryScreen.WorkingArea.Top - DisplayMargin - Height;
+            if (pos.X - Width/2 < delta.X)
+                newLocation.X = delta.X;
+            else if (pos.X + Width/2 > delta.X + workingArea.Width)
+                newLocation.X = delta.X + workingArea.Width - Width;
             DesktopLocation = newLocation;
             //Set TopMost:
             WinAPI.SetWindowPos(Handle, (IntPtr)WinAPI.HWND_TOPMOST, 0, 0, 0, 0, WinAPI.SWP_NOMOVE | WinAPI.SWP_NOSIZE | WinAPI.SWP_NOACTIVATE);
@@ -244,6 +243,13 @@ namespace DuoScreen
             UpdateMagnify(PointToClient(pos));
         }
 
+        private Point GetBottomScreenDelta()
+        {
+            Screen topScreen    = Screen.AllScreens[0];
+            Screen bottomScreen = Screen.AllScreens[1];
+            return new Point(bottomScreen.WorkingArea.Left - topScreen.WorkingArea.Left, topScreen.WorkingArea.Height + (topScreen.Bounds.Bottom - topScreen.WorkingArea.Bottom) + (bottomScreen.WorkingArea.Top - bottomScreen.Bounds.Top));
+        }
+
         private void FocusingTimer_Tick(object sender, EventArgs e)
         {
             focusingTimer.Stop();
@@ -251,5 +257,8 @@ namespace DuoScreen
             UpdateSelection(pos, true);
         }
 
+        protected override void OnPaintBackground(PaintEventArgs pevent)
+        {
+        }
     }
 }
