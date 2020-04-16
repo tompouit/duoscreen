@@ -152,5 +152,8 @@
   <ItemGroup>
     <None Include="Resources\ToTop.png" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Main_disabled.ico" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

@@ -113,10 +113,9 @@ namespace DuoScreen
             notifyIcon = new NotifyIcon(components)
             {
                 ContextMenuStrip = new ContextMenuStrip(),
-                Icon = Properties.Resources.DuoScreen,
-                Text = Program.name,
                 Visible = true
             };
+            UpdateNotifyIcon();
             ToolStripMenuItem item = new ToolStripMenuItem("&Exit");
             item.Click += ExitItem_Click;
             notifyIcon.ContextMenuStrip.Items.Add(item);
@@ -126,7 +125,28 @@ namespace DuoScreen
             GCSafetyHandle = GCHandle.Alloc(winEventDelegate);
             winEventHook = WinAPI.SetWinEventHook(WinAPI.EVENT_SYSTEM_MOVESIZESTART, WinAPI.EVENT_OBJECT_LOCATIONCHANGE, IntPtr.Zero, winEventDelegate, 0, 0, WinAPI.WINEVENT_OUTOFCONTEXT | WinAPI.WINEVENT_SKIPOWNPROCESS);
 
+            SystemEvents.DisplaySettingsChanged += new EventHandler(SystemEvents_DisplaySettingsChanged);
+
             moveDetect = new MoveDetect(BeginMovingWindow, EndMovingWindow, ContinueMovingWindow);
+        }
+
+        private void UpdateNotifyIcon()
+        {
+            if (Screen.AllScreens.Length == 2)
+            {
+                notifyIcon.Icon = Properties.Resources.DuoScreen;
+                notifyIcon.Text = Program.name;
+            }
+            else
+            {
+                notifyIcon.Icon = Properties.Resources.DuoScreen_disabled;
+                notifyIcon.Text = string.Format("{0} (disabled)", Program.name);
+            }
+        }
+
+        static void SystemEvents_DisplaySettingsChanged(object sender, EventArgs e)
+        {
+            Program.appContext.UpdateNotifyIcon();
         }
 
         private void ExitItem_Click(object sender, EventArgs e)
@@ -153,6 +173,9 @@ namespace DuoScreen
 
         void WinEventCallback(IntPtr hWinEventHook, uint eventType, IntPtr hWnd, long idObject, long idChild, uint dwEventThread, uint dwmsEventTime)
         {
+            if (Screen.AllScreens.Length != 2)
+                return;
+
             if (idObject == WinAPI.OBJID_WINDOW)
             {
                 if (eventType == WinAPI.EVENT_SYSTEM_MOVESIZESTART)
