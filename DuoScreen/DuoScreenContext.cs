@@ -191,21 +191,28 @@ namespace DuoScreen
         {
             Debug.Assert(dropBar == null);
 
-            DropBar.WindowPosType windowPos = (Screen.FromHandle(hWnd).Primary ? DropBar.WindowPosType.OnTop : DropBar.WindowPosType.OnBottom);
-            dropBar = new DropBar(windowPos);
-            dropBar.Show();
+            uint style = WinAPI.GetWindowLong(hWnd, WinAPI.GWL_STYLE);
+            bool canBeMaximized = ((style & WinAPI.WS_MAXIMIZEBOX) == WinAPI.WS_MAXIMIZEBOX) || ((style & WinAPI.WS_SIZEBOX) == WinAPI.WS_SIZEBOX);
+            if (canBeMaximized)
+            {
+                DropBar.WindowPosType windowPos = (Screen.FromHandle(hWnd).Primary ? DropBar.WindowPosType.OnTop : DropBar.WindowPosType.OnBottom);
+                dropBar = new DropBar(windowPos);
+                dropBar.Show();
+            }
         }
 
         private void ContinueMovingWindow(IntPtr hWnd)
         {
-            Debug.Assert(dropBar != null);
+            if (dropBar == null)
+                return;
 
             dropBar.UpdateWholeDisplay();
         }
 
         private void EndMovingWindow(IntPtr hWnd, Rectangle wndStartPos)
         {
-            Debug.Assert(dropBar != null);
+            if (dropBar == null)
+                return;
 
             switch (dropBar.Selection)
             {
@@ -296,7 +303,8 @@ namespace DuoScreen
                 right = Math.Min(topScreen.WorkingArea.Width, bottomScreen.WorkingArea.Right),
                 bottom = (topScreenNeedsHideTaskBar ? topScreen.Bounds.Height : topScreen.WorkingArea.Height) + (bottomScreenNeedsHideTaskBar ? bottomScreen.Bounds.Height : bottomScreen.WorkingArea.Height)
             };
-            WinAPI.AdjustWindowRectEx(ref newPos, WinAPI.GetWindowLong(hWnd, WinAPI.GWL_STYLE), false, WinAPI.GetWindowLong(hWnd, WinAPI.GWL_EXSTYLE));
+            if (!IsNewBorderlessWindow(hWnd))
+                WinAPI.AdjustWindowRectEx(ref newPos, WinAPI.GetWindowLong(hWnd, WinAPI.GWL_STYLE), false, WinAPI.GetWindowLong(hWnd, WinAPI.GWL_EXSTYLE));
             newPos.top = topScreen.Bounds.Top;
 
             WinAPI.WINDOWPLACEMENT newPlace = new WinAPI.WINDOWPLACEMENT
@@ -307,6 +315,15 @@ namespace DuoScreen
                 length = Marshal.SizeOf(typeof(WinAPI.WINDOWPLACEMENT))
             };
             WinAPI.SetWindowPlacement(hWnd, ref newPlace);
+        }
+
+        private bool IsNewBorderlessWindow(IntPtr hWnd)
+        {
+            //Check if the window has enlarged its client region to its whole window region, with a
+            //as described here: https://github.com/rossy/borderless-window (used by Visual Stutio, Visual Studio Code, ...)
+            WinAPI.GetClientRect(hWnd, out WinAPI.RectInter _rClient); Rectangle rClient = (Rectangle)_rClient;
+            WinAPI.GetWindowRect(hWnd, out WinAPI.RectInter _rWindow); Rectangle rWindow = (Rectangle)_rWindow;
+            return (rClient.Width == rWindow.Width) && (rClient.Height == rWindow.Height);
         }
     }
 

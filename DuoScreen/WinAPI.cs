@@ -203,6 +203,9 @@ namespace DuoScreen
 
         public const int WPF_SETMINPOSITION = 0x0001;
 
+        public const uint WS_MAXIMIZEBOX = 0x00010000;
+        public const uint WS_SIZEBOX = 0x00040000;
+
         public enum ABMsg : int
         {
             ABM_NEW = 0,
